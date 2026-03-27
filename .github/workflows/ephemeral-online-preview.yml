@@ -1,0 +1,105 @@
+name: Ephemeral Online Preview
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      duration_minutes:
+        description: "How long to keep the preview online (max 60)"
+        required: true
+        default: "20"
+
+jobs:
+  online-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t cloud-native-app:preview .
+
+      - name: Start application container
+        run: docker run -d --name cloud-native-app -p 8000:8000 cloud-native-app:preview
+
+      - name: Wait for app health
+        run: |
+          set -e
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:8000/health >/tmp/health.json; then
+              echo "Health check passed:"
+              cat /tmp/health.json
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "App failed to become healthy in time"
+          docker logs cloud-native-app
+          exit 1
+
+      - name: Install cloudflared
+        run: |
+          curl -L "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64" -o cloudflared
+          chmod +x cloudflared
+
+      - name: Start temporary public tunnel
+        id: tunnel
+        run: |
+          set -e
+          nohup ./cloudflared tunnel --url http://127.0.0.1:8000 --no-autoupdate > cloudflared.log 2>&1 &
+          echo $! > cloudflared.pid
+
+          for i in {1..45}; do
+            URL=$(grep -Eo 'https://[-0-9a-z]+\.trycloudflare\.com' cloudflared.log | head -n 1 || true)
+            if [ -n "$URL" ]; then
+              echo "public_url=$URL" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "Could not get tunnel URL"
+          cat cloudflared.log
+          exit 1
+
+      - name: Publish preview details
+        run: |
+          echo "## Ephemeral Preview URL" >> "$GITHUB_STEP_SUMMARY"
+          echo "${{ steps.tunnel.outputs.public_url }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "This preview is temporary and will be automatically destroyed by this workflow." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep preview online for configured duration
+        run: |
+          RAW_DURATION="${{ github.event_name == 'workflow_dispatch' && github.event.inputs.duration_minutes || '20' }}"
+          if ! [[ "$RAW_DURATION" =~ ^[0-9]+$ ]]; then
+            RAW_DURATION="20"
+          fi
+
+          if [ "$RAW_DURATION" -gt 60 ]; then
+            DURATION=60
+          elif [ "$RAW_DURATION" -lt 1 ]; then
+            DURATION=1
+          else
+            DURATION="$RAW_DURATION"
+          fi
+
+          echo "Keeping preview online for $DURATION minute(s)."
+          sleep $((DURATION * 60))
+
+      - name: Stop and remove all runtime resources
+        if: always()
+        run: |
+          set +e
+          if [ -f cloudflared.pid ]; then
+            kill "$(cat cloudflared.pid)" || true
+          fi
+          pkill -f "cloudflared tunnel --url http://127.0.0.1:8000" || true
+          docker stop cloud-native-app || true
+          docker rm -f cloud-native-app || true
+          docker image rm cloud-native-app:preview || true

@@ -73,3 +73,24 @@ The application includes a complete CI/CD pipeline that:
 - Builds and pushes Docker images
 - Deploys to container registry
 - Ensures code quality
+
+## Zero-Manual Online Preview
+
+This repository now includes an automated workflow that can run the app online with Docker and then fully clean up resources.
+
+- Workflow file: `.github/workflows/ephemeral-online-preview.yml`
+- Triggered automatically on pushes to `main` or `master`
+- Can also be started manually with a custom runtime duration
+- Builds image, starts container, opens a temporary public URL, then always stops and deletes container/image/tunnel
+
+How to use:
+
+1. Push code to `master` or `main`, or run the workflow from the Actions tab.
+1. Open the workflow run summary and copy the preview URL.
+1. After the configured duration, cleanup runs automatically.
+
+Important behavior:
+
+- The preview URL is temporary and only alive during the workflow run.
+- At the end of the run, all Docker runtime resources created by the job are removed.
+- GitHub-hosted runners are ephemeral, so no compute remains running after the job finishes.
