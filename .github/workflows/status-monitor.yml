@@ -1,5 +1,8 @@
 name: Status Monitor
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 on:
   schedule:
     - cron: '*/30 * * * *'  # Run every 30 minutes
