@@ -53,16 +53,30 @@ jobs:
     
     - name: Create health check issue if failed
       if: failure()
-      uses: actions/github-script@v6
+      uses: actions/github-script@v7
       with:
         script: |
-          github.rest.issues.create({
+          const repoInfo = await github.rest.repos.get({
+            owner: context.repo.owner,
+            repo: context.repo.repo
+          });
+
+          if (!repoInfo.data.has_issues) {
+            core.notice('Repository issues are disabled. Skipping issue creation.');
+            core.summary
+              .addHeading('Health Check Alert')
+              .addRaw('Health check failed, but repository issues are disabled so no issue was created.')
+              .write();
+            return;
+          }
+
+          await github.rest.issues.create({
             owner: context.repo.owner,
             repo: context.repo.repo,
-            title: '🚨 Health Check Failed',
+            title: 'Health Check Failed',
             body: `Health check failed at ${new Date().toISOString()}\nPlease check the service status.`,
             labels: ['incident', 'automated']
-          })
+          });
     
     - name: Notify on Slack
       if: failure()
