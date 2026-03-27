@@ -8,7 +8,7 @@ def test_read_health():
     assert response.status_code == 200
     assert response.json() == {
         "status": "healthy",
-        "version": "1.0.0"
+        "version": "2.0.0"
     }
 
 def test_create_task():
