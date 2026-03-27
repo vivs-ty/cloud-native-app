@@ -4,8 +4,9 @@ import sys
 from datetime import datetime
 
 def check_health(url):
+    base_url = url.rstrip('/')
     try:
-        response = requests.get(f"{url}/health")
+        response = requests.get(f"{base_url}/health", timeout=10)
         health_data = response.json()
         
         print(f"[{datetime.now().isoformat()}] Health Check Results:")

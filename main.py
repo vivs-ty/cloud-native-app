@@ -1,12 +1,11 @@
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
-from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 import uvicorn
 from typing import List
 import uuid
-from datetime import datetime
+from datetime import datetime, UTC
 
 app = FastAPI(title="Cloud Native App",
              description="A cloud-native FastAPI application",
@@ -52,7 +51,7 @@ async def create_task(task: TaskCreate):
         id=str(uuid.uuid4()),
         title=task.title,
         description=task.description,
-        created_at=datetime.now()
+        created_at=datetime.now(UTC)
     )
     tasks.append(new_task)
     return new_task

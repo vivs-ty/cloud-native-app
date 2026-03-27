@@ -1,7 +1,15 @@
 from fastapi.testclient import TestClient
-from main import app
+import pytest
+from main import app, tasks
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def clear_tasks():
+    tasks.clear()
+    yield
+    tasks.clear()
 
 def test_read_health():
     response = client.get("/health")

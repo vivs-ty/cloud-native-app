@@ -20,10 +20,11 @@ def get_system_metrics():
     }
 
 def check_service_status(url):
+    base_url = url.rstrip('/')
     try:
         # Check main endpoint
-        root_response = requests.get(url)
-        health_response = requests.get(f"{url}/health")
+        root_response = requests.get(base_url, timeout=10)
+        health_response = requests.get(f"{base_url}/health", timeout=10)
         
         metrics = get_system_metrics()
         
